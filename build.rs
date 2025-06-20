@@ -128,7 +128,6 @@ mod build_tesseract {
         let leptonica_lib_dir = leptonica_install_dir.join("lib");
         let tesseract_install_dir = out_dir.join("tesseract");
         let tesseract_cache_dir = cache_dir.join("tesseract");
-        let tessdata_prefix = project_dir.join("tessdata");
 
         build_or_use_cached(
             "tesseract",
@@ -160,7 +159,6 @@ mod build_tesseract {
                     .define("LEPTONICA_LIBRARY", &leptonica_lib_dir)
                     .define("CMAKE_PREFIX_PATH", &leptonica_install_dir)
                     .define("CMAKE_INSTALL_PREFIX", &tesseract_install_dir)
-                    .define("TESSDATA_PREFIX", &tessdata_prefix)
                     .define("DISABLE_TIFF", "ON")
                     .define("DISABLE_PNG", "ON")
                     .define("DISABLE_JPEG", "ON")
@@ -224,9 +222,6 @@ mod build_tesseract {
             "cargo:warning=Tesseract install dir: {:?}",
             tesseract_install_dir
         );
-        println!("cargo:warning=Tessdata dir: {:?}", tessdata_prefix);
-
-        download_tessdata(&project_dir);
     }
 
     fn get_os_specific_config() -> (String, Vec<(String, String)>) {
@@ -353,43 +348,6 @@ mod build_tesseract {
         fs::remove_file(temp_file).expect("Failed to remove temporary zip file");
 
         extract_dir
-    }
-
-    fn download_tessdata(project_dir: &Path) {
-        let tessdata_dir = project_dir.join("tessdata");
-        fs::create_dir_all(&tessdata_dir).expect("Failed to create Tessdata directory");
-
-        let languages = ["eng", "tur"];
-        let base_url = "https://github.com/tesseract-ocr/tessdata_best/raw/main/";
-        let client = reqwest::blocking::Client::new();
-
-        for lang in &languages {
-            let filename = format!("{}.traineddata", lang);
-            let file_path = tessdata_dir.join(&filename);
-
-            if !file_path.exists() {
-                let url = format!("{}{}", base_url, filename);
-                let response = client
-                    .get(&url)
-                    .send()
-                    .expect("Failed to download Tessdata");
-                let mut dest = fs::File::create(&file_path).expect("Failed to create file");
-                std::io::copy(
-                    &mut response
-                        .bytes()
-                        .expect("Failed to get response bytes")
-                        .as_ref(),
-                    &mut dest,
-                )
-                .expect("Failed to write Tessdata");
-                println!("cargo:warning={} downloaded", filename);
-            } else {
-                println!(
-                    "cargo:warning={} already exists, skipping download",
-                    filename
-                );
-            }
-        }
     }
 
     fn clean_cache(cache_dir: &Path) {
