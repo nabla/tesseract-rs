@@ -253,6 +253,39 @@ impl ResultIterator {
         Ok((text, left, top, right, bottom, confidence))
     }
 
+    /// Checks if the current iterator is at the beginning of the specified level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - Level of the iterator.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the current iterator is at the beginning of the specified level, otherwise returns `false`.
+    pub fn is_at_beginning_of(&self, level: TessPageIteratorLevel) -> bool {
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessPageIteratorIsAtBeginningOf(*handle, level as c_int) != 0 }
+    }
+
+    /// Checks if the current iterator is at the final element of the specified level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - Level of the iterator.
+    /// * `element` - Element of the iterator.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the current iterator is at the final element of the specified level, otherwise returns `false`.
+    pub fn is_at_final_element(
+        &self,
+        level: TessPageIteratorLevel,
+        element: TessPageIteratorLevel,
+    ) -> bool {
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessPageIteratorIsAtFinalElement(*handle, level as c_int, element as c_int) != 0 }
+    }
+
     /// Gets the bounding box for the current element.
     pub fn get_bounding_box(&self, level: TessPageIteratorLevel) -> Result<(i32, i32, i32, i32)> {
         let mut left = 0;
@@ -316,6 +349,14 @@ extern "C" {
     pub fn TessResultIteratorSymbolIsSubscript(handle: *mut c_void) -> c_int;
     pub fn TessResultIteratorSymbolIsDropcap(handle: *mut c_void) -> c_int;
     pub fn TessResultIteratorNext(handle: *mut c_void, level: c_int) -> c_int;
+
+    // These calls are fine because result iterators are also page iterators.
+    pub fn TessPageIteratorIsAtBeginningOf(handle: *mut c_void, level: c_int) -> c_int;
+    pub fn TessPageIteratorIsAtFinalElement(
+        handle: *mut c_void,
+        level: c_int,
+        element: c_int,
+    ) -> c_int;
     pub fn TessPageIteratorBoundingBox(
         handle: *mut c_void,
         level: c_int,
