@@ -1129,22 +1129,12 @@ impl TesseractAPI {
     /// * `data_size` - Size of the data.
     /// * `language` - Language to use.
     /// * `oem` - OCR engine mode.
-    /// * `configs` - Configuration strings.
     ///
     /// # Returns
     ///
     /// Returns `Ok(())` if initializing the OCR engine is successful, otherwise returns an error.
-    pub fn init_5(
-        &self,
-        data: &[u8],
-        data_size: i32,
-        language: &str,
-        oem: i32,
-        configs: &[&str],
-    ) -> Result<()> {
+    pub fn init_5(&self, data: &[u8], data_size: i32, language: &str, oem: i32) -> Result<()> {
         let language = CString::new(language).unwrap();
-        let config_ptrs: Vec<_> = configs.iter().map(|&s| CString::new(s).unwrap()).collect();
-        let config_ptr_ptrs: Vec<_> = config_ptrs.iter().map(|cs| cs.as_ptr()).collect();
         let handle = self
             .handle
             .lock()
@@ -1152,12 +1142,16 @@ impl TesseractAPI {
         let result = unsafe {
             TessBaseAPIInit5(
                 *handle,
-                data.as_ptr(),
+                data.as_ptr().cast(),
                 data_size,
                 language.as_ptr(),
                 oem,
-                config_ptr_ptrs.as_ptr(),
-                config_ptrs.len() as c_int,
+                std::ptr::null_mut(),
+                0,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                0,
+                0,
             )
         };
         if result != 0 {
@@ -1556,12 +1550,16 @@ extern "C" {
     ) -> c_int;
     fn TessBaseAPIInit5(
         handle: *mut c_void,
-        data: *const u8,
+        data: *const c_char,
         data_size: c_int,
         language: *const c_char,
-        oem: c_int,
-        configs: *const *const c_char,
+        mode: c_int,
+        configs: *mut *mut c_char,
         configs_size: c_int,
+        vars_vec: *mut *mut c_char,
+        vars_values: *mut *mut c_char,
+        vars_vec_size: usize,
+        set_only_non_debug_params: c_int,
     ) -> c_int;
     fn TessBaseAPISetImage(
         handle: *mut c_void,
