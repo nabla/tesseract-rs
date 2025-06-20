@@ -6,9 +6,9 @@ mod build_tesseract {
     use std::path::{Path, PathBuf};
 
     const LEPTONICA_URL: &str =
-        "https://github.com/DanBloomberg/leptonica/archive/refs/heads/master.zip";
+        "https://github.com/DanBloomberg/leptonica/archive/refs/tags/1.85.0.zip";
     const TESSERACT_URL: &str =
-        "https://github.com/tesseract-ocr/tesseract/archive/refs/heads/main.zip";
+        "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.1.zip";
 
     pub fn build() {
         let custom_out_dir = if cfg!(target_os = "macos") {
