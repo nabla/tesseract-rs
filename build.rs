@@ -154,7 +154,7 @@ mod build_tesseract {
                     .define("DISABLE_ARCHIVE", "ON")
                     .define("DISABLE_CURL", "ON")
                     .define("DISABLE_OPENCL", "ON")
-                    .define("Leptonica_DIR", &leptonica_install_dir)
+                    .define("LEPTONICA_DIR", &leptonica_install_dir)
                     .define("LEPTONICA_INCLUDE_DIR", &leptonica_include_dir)
                     .define("LEPTONICA_LIBRARY", &leptonica_lib_dir)
                     .define("CMAKE_PREFIX_PATH", &leptonica_install_dir)
@@ -381,10 +381,12 @@ mod build_tesseract {
                 println!("cargo:warning=Failed to copy cached library: {}", e);
                 // If cache copy fails, rebuild
                 build_fn();
+                rename_versioned_libraries_if_needed(name, install_dir);
             }
         } else {
             println!("Building {} library", name);
             build_fn();
+            rename_versioned_libraries_if_needed(name, install_dir);
 
             if out_path.exists() {
                 if let Err(e) = fs::copy(&out_path, &cached_path) {
@@ -404,6 +406,44 @@ mod build_tesseract {
         );
 
         println!("cargo:rustc-link-lib=static={}", name);
+    }
+
+    /// Handle versioned library files on Windows (e.g. `leptonica-1.85.1d.lib`) by copying them to the unversioned name.
+    fn rename_versioned_libraries_if_needed(name: &str, install_dir: &Path) {
+        if cfg!(target_os = "windows") {
+            let lib_dir = install_dir.join("lib");
+            let expected_lib_name = format!("{}.lib", name);
+            let expected_lib_path = lib_dir.join(&expected_lib_name);
+
+            if !expected_lib_path.exists() {
+                if let Ok(entries) = fs::read_dir(&lib_dir) {
+                    for entry in entries.flatten() {
+                        let file_name = entry.file_name();
+                        let file_name_str = file_name.to_string_lossy();
+                        if file_name_str.starts_with(name)
+                            && file_name_str.ends_with(".lib")
+                            && file_name_str != expected_lib_name
+                        {
+                            let versioned_lib_path = entry.path();
+                            println!("Found versioned library: {}", file_name_str);
+
+                            if let Err(e) = fs::copy(&versioned_lib_path, &expected_lib_path) {
+                                println!(
+                                    "cargo:warning=Failed to copy versioned library {} to {}: {}",
+                                    file_name_str, expected_lib_name, e
+                                );
+                            } else {
+                                println!(
+                                    "cargo:warning=Copied {} to {}",
+                                    file_name_str, expected_lib_name
+                                );
+                                break; // Stop after renaming the first match.
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
