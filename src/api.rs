@@ -564,63 +564,6 @@ impl TesseractAPI {
         Ok(confidences)
     }
 
-    /// Adapts to the word string.
-    ///
-    /// # Arguments
-    ///
-    /// * `mode` - Mode.
-    /// * `wordstr` - Word string.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if adaptation is successful, otherwise returns `false`.
-    pub fn adapt_to_word_str(&self, mode: i32, wordstr: &str) -> Result<bool> {
-        let handle = self
-            .handle
-            .lock()
-            .map_err(|_| TesseractError::MutexLockError)?;
-        let wordstr = CString::new(wordstr).unwrap();
-        let result = unsafe { TessBaseAPIAdaptToWordStr(*handle, mode, wordstr.as_ptr()) };
-        Ok(result != 0)
-    }
-
-    /// Detects the orientation and script.
-    ///
-    /// # Returns
-    ///
-    /// Returns a tuple containing the orientation in degrees, the orientation confidence, the script name, and the script confidence.
-    pub fn detect_os(&self) -> Result<(i32, f32, String, f32)> {
-        let handle = self
-            .handle
-            .lock()
-            .map_err(|_| TesseractError::MutexLockError)?;
-        let mut orient_deg = 0;
-        let mut orient_conf = 0.0;
-        let mut script_name_ptr = std::ptr::null_mut();
-        let mut script_conf = 0.0;
-        let result = unsafe {
-            TessBaseAPIDetectOrientationScript(
-                *handle,
-                &mut orient_deg,
-                &mut orient_conf,
-                &mut script_name_ptr,
-                &mut script_conf,
-            )
-        };
-        if result == 0 {
-            return Err(TesseractError::OcrError);
-        }
-        let script_name = if !script_name_ptr.is_null() {
-            let c_str = unsafe { CStr::from_ptr(script_name_ptr) };
-            let result = c_str.to_str()?.to_owned();
-            unsafe { TessDeleteText(script_name_ptr) };
-            result
-        } else {
-            String::new()
-        };
-        Ok((orient_deg, orient_conf, script_name, script_conf))
-    }
-
     /// Sets the minimum orientation margin.
     ///
     /// # Arguments
@@ -938,20 +881,6 @@ impl TesseractAPI {
         }
         unsafe { TessDeleteTextArray(vec_ptr) };
         Ok(result)
-    }
-
-    /// Clears the adaptive classifier.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if clearing the adaptive classifier is successful, otherwise returns an error.
-    pub fn clear_adaptive_classifier(&self) -> Result<()> {
-        let handle = self
-            .handle
-            .lock()
-            .map_err(|_| TesseractError::MutexLockError)?;
-        unsafe { TessBaseAPIClearAdaptiveClassifier(*handle) };
-        Ok(())
     }
 
     /// Clears the OCR engine.
@@ -1358,25 +1287,6 @@ impl TesseractAPI {
         }
     }
 
-    /// Gets the Unicode character for a given ID.
-    ///
-    /// # Arguments
-    ///
-    /// * `unichar_id` - ID of the Unicode character.
-    ///
-    /// # Returns
-    ///
-    /// Returns the Unicode character as a String if successful, otherwise returns an error.
-    pub fn get_unichar(unichar_id: i32) -> Result<String> {
-        let char_ptr = unsafe { TessGetUnichar(unichar_id) };
-        if char_ptr.is_null() {
-            Err(TesseractError::NullPointerError)
-        } else {
-            let c_str = unsafe { CStr::from_ptr(char_ptr) };
-            Ok(c_str.to_str()?.to_owned())
-        }
-    }
-
     /// Gets a page iterator for analyzing layout and getting bounding boxes
     pub fn analyze_layout(&self) -> Result<PageIterator> {
         let handle = self
@@ -1486,15 +1396,6 @@ extern "C" {
     fn TessBaseAPIGetWordStrBoxText(handle: *mut c_void, page: c_int) -> *mut c_char;
     fn TessBaseAPIGetUNLVText(handle: *mut c_void) -> *mut c_char;
     fn TessBaseAPIAllWordConfidences(handle: *mut c_void) -> *const c_int;
-    fn TessBaseAPIAdaptToWordStr(handle: *mut c_void, mode: c_int, wordstr: *const c_char)
-        -> c_int;
-    fn TessBaseAPIDetectOrientationScript(
-        handle: *mut c_void,
-        orient_deg: *mut c_int,
-        orient_conf: *mut c_float,
-        script_name: *mut *mut c_char,
-        script_conf: *mut c_float,
-    ) -> c_int;
     fn TessBaseAPISetMinOrientationMargin(handle: *mut c_void, margin: c_double);
     fn TessBaseAPIGetMutableIterator(handle: *mut c_void) -> *mut c_void;
     fn TessDeleteIntArray(arr: *const c_int);
@@ -1515,7 +1416,6 @@ extern "C" {
     fn TessBaseAPIGetInitLanguagesAsString(handle: *mut c_void) -> *const c_char;
     fn TessBaseAPIGetLoadedLanguagesAsVector(handle: *mut c_void) -> *mut *mut c_char;
     fn TessBaseAPIGetAvailableLanguagesAsVector(handle: *mut c_void) -> *mut *mut c_char;
-    fn TessBaseAPIClearAdaptiveClassifier(handle: *mut c_void);
     fn TessDeleteTextArray(arr: *mut *mut c_char);
 
     fn TessVersion() -> *const c_char;
@@ -1588,8 +1488,6 @@ extern "C" {
         out_confidence: *mut c_float,
     );
     pub fn TessDeleteText(text: *mut c_char);
-
-    fn TessGetUnichar(unichar_id: c_int) -> *const c_char;
 
     fn TessBaseAPIProcessPages(
         handle: *mut c_void,
